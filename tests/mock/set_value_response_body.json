@@ -1,0 +1,15 @@
+{
+  "request_id": "ee37d9ae-2b7d-6add-ae2a-43b1722e01a7",
+  "lease_id": "",
+  "renewable": false,
+  "lease_duration": 0,
+  "data": {
+    "created_time": "2020-01-14T09:26:18.9511939Z",
+    "deletion_time": "",
+    "destroyed": false,
+    "version": 1
+  },
+  "wrap_info": null,
+  "warnings": null,
+  "auth": null
+}

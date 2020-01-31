@@ -1,0 +1,87 @@
+---
+stages:
+    - Packages check
+    - Install packages
+    - Code analysis
+    - Tests
+
+Packages security:
+    image: php:7.4-cli-alpine
+    stage: Packages check
+    tags: [docker-in-docker]
+    dependencies: []
+    script:
+        - apk update
+        - apk add openssl
+        - wget https://get.sensiolabs.org/security-checker.phar -nv -O security-checker && chmod a+x security-checker && mv security-checker /usr/local/bin/security-checker
+        - security-checker security:check ./composer.lock
+
+.get_composer: &get_composer
+    before_script:
+        - apk update
+        - apk add git openssl
+        - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+Composer validate:
+    image: php:7.4-cli-alpine
+    stage: Packages check
+    tags: [docker-in-docker]
+    dependencies: []
+    <<: *get_composer
+    script:
+        - composer validate --strict
+
+Composer outdated packages:
+    image: php:7.4-cli-alpine
+    stage: Packages check
+    tags: [docker-in-docker]
+    allow_failure: true
+    <<: *get_composer
+    script:
+        - composer outdated --direct --strict --format=json
+
+Composer install:
+    image: php:7.4-cli-alpine
+    stage: Install packages
+    tags: [docker-in-docker]
+    when: on_success
+    artifacts:
+        name: "$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHA"
+        when: on_success
+        expire_in: 30 mins
+        paths:
+            - vendor/
+    <<: *get_composer
+    script:
+        - composer install --no-scripts --no-progress --no-interaction
+
+.Base test: &base_test
+    image: php:7.4-cli-alpine
+    tags: [docker-in-docker]
+
+PHP CS Fixer:
+    <<: *base_test
+    stage: Code analysis
+    when: on_success
+    script:
+        - ./vendor/bin/php-cs-fixer fix --diff --dry-run --verbose
+
+PHP Stan:
+    <<: *base_test
+    stage: Code analysis
+    when: on_success
+    script:
+        - ./vendor/bin/phpstan.phar analyze . --level=max --memory-limit=512M
+
+PHP Code Sniffer:
+    <<: *base_test
+    stage: Code analysis
+    script:
+        - ./vendor/bin/phpcs src -p --no-colors
+
+PHPUnit Tests:
+    <<: *base_test
+    stage: Tests
+    when: on_success
+    script:
+        - php -d memory_limit=2048M vendor/bin/phpunit --columns 64
